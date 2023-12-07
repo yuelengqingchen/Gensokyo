@@ -35,20 +35,30 @@ func handleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 	//如果获取不到 就用user_id获取信息类型
 	if msgType == "" {
 		msgType = GetMessageTypeByUserid(config.GetAppIDStr(), message.Params.UserID)
+	} else {
+		mylog.Printf("获取到信息类型:%v", msgType)
 	}
 
 	//如果获取不到 就用group_id获取信息类型
 	if msgType == "" {
 		msgType = GetMessageTypeByGroupid(config.GetAppIDStr(), message.Params.GroupID)
+	} else {
+		mylog.Printf("GetMessageTypeByUserid获取到信息类型:%v", msgType)
 	}
+	
 	//新增 内存获取不到从数据库获取
 	if msgType == "" {
 		msgType = GetMessageTypeByUseridV2(message.Params.UserID)
+	} else {
+		mylog.Printf("GetMessageTypeByGroupid获取到信息类型:%v", msgType)
 	}
+	
 	if msgType == "" {
 		msgType = GetMessageTypeByGroupidV2(message.Params.GroupID)
+	} else {
+		mylog.Printf("GetMessageTypeByUseridV2获取到信息类型:%v", msgType)
 	}
-	mylog.Printf("send_group_msg获取到信息类型:%v", msgType)
+	mylog.Printf("获取到信息类型:%v", msgType)
 	var idInt64 int64
 	var err error
 	var ret *dto.GroupMessageResponse
