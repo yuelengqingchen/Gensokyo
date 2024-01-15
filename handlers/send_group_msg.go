@@ -32,7 +32,6 @@ func init() {
 func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openapi.OpenAPI, message callapi.ActionMessage) (string, error) {
 	// 使用 message.Echo 作为key来获取消息类型
 	var msgType string
-	var ret *dto.GroupMessageResponse
 	var err error
 	var retmsg string
 
@@ -205,7 +204,7 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 
 			}
 			// 发送组合消息
-			ret, err = apiv2.PostGroupMessage(context.TODO(), message.Params.GroupID.(string), groupMessage)
+			err = apiv2.PostGroupMessage(context.TODO(), message.Params.GroupID.(string), groupMessage)
 			if err != nil {
 				mylog.Printf("发送组合消息失败: %v", err)
 				return "", nil // 或其他错误处理
@@ -232,7 +231,7 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 
 			groupMessage.Timestamp = time.Now().Unix() // 设置时间戳
 			//重新为err赋值
-			ret, err = apiv2.PostGroupMessage(context.TODO(), message.Params.GroupID.(string), groupMessage)
+			err = apiv2.PostGroupMessage(context.TODO(), message.Params.GroupID.(string), groupMessage)
 			if err != nil {
 				mylog.Printf("发送文本群组信息失败: %v", err)
 			}
@@ -901,38 +900,6 @@ func uploadMedia(ctx context.Context, groupID string, richMediaMessage *dto.Rich
 	}
 	// 返回上传后的FileInfo
 	return messageReturn.MediaResponse.FileInfo, nil
-}
-
-// 发送栈中的消息
-func SendStackMessages(apiv2 openapi.OpenAPI, messageid string, originalGroupID string) {
-	count := config.GetAtoPCount()
-	mylog.Printf("取出数量: %v", count)
-	pairs := echo.PopGlobalStackMulti(count)
-	for i, pair := range pairs {
-		mylog.Printf("%v: %v", pair.Group, originalGroupID)
-		if pair.Group == originalGroupID {
-			// 发送消息
-			messageID := pair.GroupMessage.MsgID
-			msgseq := echo.GetMappingSeq(messageID)
-			echo.AddMappingSeq(messageID, msgseq+1)
-			pair.GroupMessage.MsgSeq = msgseq + 1
-			pair.GroupMessage.MsgID = messageid
-			ret, err := apiv2.PostGroupMessage(context.TODO(), pair.Group, pair.GroupMessage)
-			if err != nil {
-				mylog.Printf("发送组合消息失败: %v", err)
-				continue
-			} else {
-				echo.RemoveFromGlobalStack(i)
-			}
-
-			// 检查错误码
-			if ret != nil && ret.Message.Ret == 22009 {
-				mylog.Printf("信息再次发送失败,加入到队列中,下次被动信息进行发送")
-				echo.PushGlobalStack(pair)
-			}
-		}
-
-	}
 }
 
 func auto_md(message callapi.ActionMessage, messageText string, richMediaMessage *dto.RichMediaMessage) (md *dto.Markdown, kb *keyboard.MessageKeyboard, transmd bool) {
