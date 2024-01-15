@@ -75,7 +75,7 @@ func SendResponse(client callapi.Client, err error, message *callapi.ActionMessa
 		return "", sendErr
 	}
 
-	mylog.Debug("发送成功回执: %+v", string(jsonResponse))
+	mylog.Debugf("发送成功回执: %+v", string(jsonResponse))
 	return string(jsonResponse), nil
 }
 
