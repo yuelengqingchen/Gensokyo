@@ -65,10 +65,10 @@ func wsHandler(api openapi.OpenAPI, apiV2 openapi.OpenAPI, p *Processor.Processo
 	// 如果配置的 token 不为空，但提供的 token 为空或不匹配
 	if validToken != "" && (token == "" || token != validToken) {
 		if token == "" {
-			mylog.Printf("Connection failed due to missing token. Headers: %v", c.Request.Header)
+			mylog.Debug("Connection failed due to missing token. Headers: %v", c.Request.Header)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing token"})
 		} else {
-			mylog.Printf("Connection failed due to incorrect token. Headers: %v, Provided token: %s", c.Request.Header, token)
+			mylog.Debug("Connection failed due to incorrect token. Headers: %v, Provided token: %s", c.Request.Header, token)
 			c.JSON(http.StatusForbidden, gin.H{"error": "Incorrect token"})
 		}
 		return
@@ -76,12 +76,12 @@ func wsHandler(api openapi.OpenAPI, apiV2 openapi.OpenAPI, p *Processor.Processo
 
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		mylog.Printf("Failed to set websocket upgrade: %+v", err)
+		mylog.Debug("Failed to set websocket upgrade: %+v", err)
 		return
 	}
 
 	clientIP := c.ClientIP()
-	mylog.Printf("WebSocket client connected. IP: %s", clientIP)
+	mylog.Debug("WebSocket client connected. IP: %s", clientIP)
 
 	// 创建WebSocketServerClient实例
 	client := &WebSocketServerClient{
@@ -105,7 +105,7 @@ func wsHandler(api openapi.OpenAPI, apiV2 openapi.OpenAPI, p *Processor.Processo
 	}
 	err = client.SendMessage(message)
 	if err != nil {
-		mylog.Printf("Error sending connection success message: %v\n", err)
+		mylog.Debug("Error sending connection success message: %v\n", err)
 	}
 
 	// 在defer语句之前运行
@@ -124,7 +124,7 @@ func wsHandler(api openapi.OpenAPI, apiV2 openapi.OpenAPI, p *Processor.Processo
 	for {
 		messageType, p, err := conn.ReadMessage()
 		if err != nil {
-			mylog.Printf("Error reading message: %v", err)
+			mylog.Debug("Error reading message: %v", err)
 			return
 		}
 
@@ -138,7 +138,7 @@ func processWSMessage(client *WebSocketServerClient, msg []byte) {
 	var message callapi.ActionMessage
 	err := json.Unmarshal(msg, &message)
 	if err != nil {
-		mylog.Printf("Error unmarshalling message: %v, Original message: %s", err, string(msg))
+		mylog.Debug("Error unmarshalling message: %v, Original message: %s", err, string(msg))
 		return
 	}
 
