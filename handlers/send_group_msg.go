@@ -32,6 +32,7 @@ func init() {
 func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openapi.OpenAPI, message callapi.ActionMessage) (string, error) {
 	// 使用 message.Echo 作为key来获取消息类型
 	var msgType string
+	var ret *dto.GroupMessageResponse
 	var err error
 	var retmsg string
 
