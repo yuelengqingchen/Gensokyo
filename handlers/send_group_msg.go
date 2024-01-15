@@ -33,7 +33,6 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 	// 使用 message.Echo 作为key来获取消息类型
 	var msgType string
 	msgType = "group"
-	var idInt64 int64
 	var err error
 	var ret *dto.GroupMessageResponse
 	var retmsg string
@@ -60,15 +59,11 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 				messageID = echo.GetLazyMessagesId(message.Params.UserID.(string))
 				mylog.Printf("GetLazyMessagesIdv2: %v", messageID)
 			}
-			if messageID != "" {
-				//尝试发送栈内信息
-				SSM = true
-			}
 		}
 		if messageID == "" {
 			if echoStr, ok := message.Echo.(string); ok {
 				messageID = echo.GetMsgIDByKey(echoStr)
-				mylog.Debug("echo取群组发信息对应的message_id:", messageID)
+				mylog.Debugf("echo取群组发信息对应的message_id:", messageID)
 			}
 		}
 		var originalGroupID, originalUserID string
@@ -77,7 +72,7 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 			// 如果UserID不是nil且配置为使用Pro版本，则调用RetrieveRowByIDv2Pro
 			originalGroupID, originalUserID, err = idmap.RetrieveRowByIDv2Pro(message.Params.GroupID.(string), message.Params.UserID.(string))
 			if err != nil {
-				mylog.Error("Error1 retrieving original GroupID: %v", err)
+				mylog.Errorf("Error1 retrieving original GroupID: %v", err)
 			}
 			if originalGroupID == "" {
 				originalGroupID, err = idmap.RetrieveRowByIDv2(message.Params.GroupID.(string))
@@ -117,10 +112,10 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 			// 检查 UserID 是否为 nil
 			if message.Params.UserID != nil {
 				messageID = GetMessageIDByUseridAndGroupid(config.GetAppIDStr(), message.Params.UserID, message.Params.GroupID)
-				mylog.Debug("通过GetMessageIDByUseridAndGroupid函数获取的message_id:", message.Params.GroupID, messageID)
+				mylog.Debugf("通过GetMessageIDByUseridAndGroupid函数获取的message_id:", message.Params.GroupID, messageID)
 			} else {
 				// 如果 UserID 是 nil，可以在这里处理，例如记录日志或采取其他措施
-				mylog.Debug("UserID 为 nil,跳过 GetMessageIDByUseridAndGroupid 调用")
+				mylog.Debugf("UserID 为 nil,跳过 GetMessageIDByUseridAndGroupid 调用")
 			}
 		}
 		// 如果messageID为空，通过函数获取
@@ -132,7 +127,7 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 		if config.GetDevMsgID() {
 			messageID = "1000"
 		}
-		mylog.Debug("群组发信息使用messageID:[%v]", messageID)
+		mylog.Debugf("群组发信息使用messageID:[%v]", messageID)
 		var singleItem = make(map[string][]string)
 		var imageType, imageUrl string
 		imageCount := 0
@@ -157,7 +152,7 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 		}
 
 		if imageCount == 1 && messageText != "" {
-			mylog.Debug("发图文混合信息-群")
+			mylog.Debugf("发图文混合信息-群")
 			// 创建包含单个图片的 singleItem
 			singleItem[imageType] = []string{imageUrl}
 			msgseq := echo.GetMappingSeq(messageID)
@@ -237,7 +232,7 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 			// 进行类型断言
 			groupMessage, ok := groupReply.(*dto.MessageToCreate)
 			if !ok {
-				mylog.Debug("Error: Expected MessageToCreate type.")
+				mylog.Debugf("Error: Expected MessageToCreate type.")
 				return "", nil // 或其他错误处理
 			}
 
