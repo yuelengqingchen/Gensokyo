@@ -23,7 +23,6 @@ import (
 	"github.com/tencent-connect/botgo/dto"
 	"github.com/tencent-connect/botgo/dto/keyboard"
 	"github.com/tencent-connect/botgo/openapi"
-	"mvdan.cc/xurls" //xurls是一个从文本提取url的库 适用于多种场景
 )
 
 var BotID string
