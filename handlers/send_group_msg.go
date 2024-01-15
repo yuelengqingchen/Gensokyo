@@ -32,16 +32,9 @@ func init() {
 func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openapi.OpenAPI, message callapi.ActionMessage) (string, error) {
 	// 使用 message.Echo 作为key来获取消息类型
 	var msgType string
-	var idInt64 int64
 	var err error
 	var ret *dto.GroupMessageResponse
 	var retmsg string
-
-	if message.Params.GroupID != "" {
-		idInt64, err = ConvertToInt64(message.Params.GroupID)
-	} else if message.Params.UserID != "" {
-		idInt64, err = ConvertToInt64(message.Params.UserID)
-	}
 
 	msgType = "group"
 	
@@ -49,7 +42,6 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 	case "group":
 		// 解析消息内容
 		messageText, foundItems := parseMessageContent(message.Params, message, client, api, apiv2)
-		var SSM bool
 		// 使用 echo 获取消息ID
 		var messageID string
 		if config.GetLazyMessageId() {
