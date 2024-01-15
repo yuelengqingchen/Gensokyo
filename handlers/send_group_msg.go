@@ -32,23 +32,7 @@ func init() {
 func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openapi.OpenAPI, message callapi.ActionMessage) (string, error) {
 	// 使用 message.Echo 作为key来获取消息类型
 	var msgType string
-	if echoStr, ok := message.Echo.(string); ok {
-		// 当 message.Echo 是字符串类型时执行此块
-		msgType = echo.GetMsgTypeByKey(echoStr)
-	}
-	if msgType == "" {
-		msgType = GetMessageTypeByGroupid(config.GetAppIDStr(), message.Params.GroupID)
-	}
-	if msgType == "" {
-		msgType = GetMessageTypeByUserid(config.GetAppIDStr(), message.Params.UserID)
-	}
-	if msgType == "" {
-		msgType = GetMessageTypeByGroupidV2(message.Params.GroupID)
-	}
-	if msgType == "" {
-		msgType = GetMessageTypeByUseridV2(message.Params.UserID)
-	}
-	mylog.Printf("send_group_msg获取到信息类型:%v", msgType)
+	msgType = "group"
 	var idInt64 int64
 	var err error
 	var ret *dto.GroupMessageResponse
@@ -58,20 +42,6 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 		idInt64, err = ConvertToInt64(message.Params.GroupID)
 	} else if message.Params.UserID != "" {
 		idInt64, err = ConvertToInt64(message.Params.UserID)
-	}
-
-	//设置递归 对直接向gsk发送action时有效果
-	if msgType == "" {
-		messageCopy := message
-		if err != nil {
-			mylog.Printf("错误：无法转换 ID %v\n", err)
-		} else {
-			// 递归3次
-			echo.AddMapping(idInt64, 4)
-			// 递归调用handleSendGroupMsg，使用设置的消息类型
-			echo.AddMsgType(config.GetAppIDStr(), idInt64, "group_private")
-			retmsg, _ = HandleSendGroupMsg(client, api, apiv2, messageCopy)
-		}
 	}
 
 	switch msgType {
@@ -98,7 +68,7 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 		if messageID == "" {
 			if echoStr, ok := message.Echo.(string); ok {
 				messageID = echo.GetMsgIDByKey(echoStr)
-				mylog.Println("echo取群组发信息对应的message_id:", messageID)
+				mylog.Debug("echo取群组发信息对应的message_id:", messageID)
 			}
 		}
 		var originalGroupID, originalUserID string
@@ -107,9 +77,8 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 			// 如果UserID不是nil且配置为使用Pro版本，则调用RetrieveRowByIDv2Pro
 			originalGroupID, originalUserID, err = idmap.RetrieveRowByIDv2Pro(message.Params.GroupID.(string), message.Params.UserID.(string))
 			if err != nil {
-				mylog.Printf("Error1 retrieving original GroupID: %v", err)
+				mylog.Error("Error1 retrieving original GroupID: %v", err)
 			}
-			mylog.Printf("测试,通过idmaps-pro获取的originalGroupID:%v", originalGroupID)
 			if originalGroupID == "" {
 				originalGroupID, err = idmap.RetrieveRowByIDv2(message.Params.GroupID.(string))
 				if err != nil {
@@ -143,21 +112,15 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 		}
 		message.Params.GroupID = originalGroupID
 		message.Params.UserID = originalUserID
-		if SSM {
-			//mylog.Printf("正在使用Msgid:%v 补发之前失败的主动信息,请注意AtoP不要设置超过3,否则可能会影响正常信息发送", messageID)
-			//mylog.Printf("originalGroupID:%v ", originalGroupID)
-			SendStackMessages(apiv2, messageID, originalGroupID)
-		}
 		mylog.Println("群组发信息messageText:", messageText)
-		//mylog.Println("foundItems:", foundItems)
 		if messageID == "" {
 			// 检查 UserID 是否为 nil
 			if message.Params.UserID != nil {
 				messageID = GetMessageIDByUseridAndGroupid(config.GetAppIDStr(), message.Params.UserID, message.Params.GroupID)
-				mylog.Println("通过GetMessageIDByUseridAndGroupid函数获取的message_id:", message.Params.GroupID, messageID)
+				mylog.Debug("通过GetMessageIDByUseridAndGroupid函数获取的message_id:", message.Params.GroupID, messageID)
 			} else {
 				// 如果 UserID 是 nil，可以在这里处理，例如记录日志或采取其他措施
-				mylog.Println("UserID 为 nil,跳过 GetMessageIDByUseridAndGroupid 调用")
+				mylog.Debug("UserID 为 nil,跳过 GetMessageIDByUseridAndGroupid 调用")
 			}
 		}
 		// 如果messageID为空，通过函数获取
@@ -169,7 +132,7 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 		if config.GetDevMsgID() {
 			messageID = "1000"
 		}
-		mylog.Printf("群组发信息使用messageID:[%v]", messageID)
+		mylog.Debug("群组发信息使用messageID:[%v]", messageID)
 		var singleItem = make(map[string][]string)
 		var imageType, imageUrl string
 		imageCount := 0
@@ -194,7 +157,7 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 		}
 
 		if imageCount == 1 && messageText != "" {
-			mylog.Printf("发图文混合信息-群")
+			mylog.Debug("发图文混合信息-群")
 			// 创建包含单个图片的 singleItem
 			singleItem[imageType] = []string{imageUrl}
 			msgseq := echo.GetMappingSeq(messageID)
@@ -258,14 +221,6 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 				mylog.Printf("发送组合消息失败: %v", err)
 				return "", nil // 或其他错误处理
 			}
-			if ret != nil && ret.Message.Ret == 22009 {
-				mylog.Printf("信息发送失败,加入到队列中,下次被动信息进行发送")
-				var pair echo.MessageGroupPair
-				pair.Group = message.Params.GroupID.(string)
-				pair.GroupMessage = groupMessage
-				echo.PushGlobalStack(pair)
-			}
-
 			// 发送成功回执
 			retmsg, _ = SendResponse(client, err, &message)
 
@@ -282,7 +237,7 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 			// 进行类型断言
 			groupMessage, ok := groupReply.(*dto.MessageToCreate)
 			if !ok {
-				mylog.Println("Error: Expected MessageToCreate type.")
+				mylog.Debug("Error: Expected MessageToCreate type.")
 				return "", nil // 或其他错误处理
 			}
 
@@ -291,13 +246,6 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 			ret, err = apiv2.PostGroupMessage(context.TODO(), message.Params.GroupID.(string), groupMessage)
 			if err != nil {
 				mylog.Printf("发送文本群组信息失败: %v", err)
-			}
-			if ret != nil && ret.Message.Ret == 22009 {
-				mylog.Printf("信息发送失败,加入到队列中,下次被动信息进行发送")
-				var pair echo.MessageGroupPair
-				pair.Group = message.Params.GroupID.(string)
-				pair.GroupMessage = groupMessage
-				echo.PushGlobalStack(pair)
 			}
 			//发送成功回执
 			retmsg, _ = SendResponse(client, err, &message)
@@ -328,13 +276,6 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 						if err != nil {
 							mylog.Printf("发送md信息失败: %v", err)
 						}
-						if ret != nil && ret.Message.Ret == 22009 {
-							mylog.Printf("信息发送失败,加入到队列中,下次被动信息进行发送")
-							var pair echo.MessageGroupPair
-							pair.Group = message.Params.GroupID.(string)
-							pair.GroupMessage = groupMessage
-							echo.PushGlobalStack(pair)
-						}
 						//发送成功回执
 						retmsg, _ = SendResponse(client, err, &message)
 					}
@@ -343,30 +284,6 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 				message_return, err := apiv2.PostGroupMessage(context.TODO(), message.Params.GroupID.(string), richMediaMessage)
 				if err != nil {
 					mylog.Printf("发送 %s 信息失败_send_group_msg: %v", key, err)
-					if config.GetSendError() { //把报错当作文本发出去
-						msgseq := echo.GetMappingSeq(messageID)
-						echo.AddMappingSeq(messageID, msgseq+1)
-						groupReply := generateGroupMessage(messageID, nil, err.Error(), msgseq+1)
-						// 进行类型断言
-						groupMessage, ok := groupReply.(*dto.MessageToCreate)
-						if !ok {
-							mylog.Println("Error: Expected MessageToCreate type.")
-							return "", nil // 或其他错误处理
-						}
-						groupMessage.Timestamp = time.Now().Unix() // 设置时间戳
-						//重新为err赋值
-						ret, err = apiv2.PostGroupMessage(context.TODO(), message.Params.GroupID.(string), groupMessage)
-						if err != nil {
-							mylog.Printf("发送文本报错信息失败: %v", err)
-						}
-						if ret != nil && ret.Message.Ret == 22009 {
-							mylog.Printf("信息发送失败,加入到队列中,下次被动信息进行发送")
-							var pair echo.MessageGroupPair
-							pair.Group = message.Params.GroupID.(string)
-							pair.GroupMessage = groupMessage
-							echo.PushGlobalStack(pair)
-						}
-					}
 				}
 				if message_return != nil && message_return.MediaResponse != nil && message_return.MediaResponse.FileInfo != "" {
 					msgseq := echo.GetMappingSeq(messageID)
@@ -386,13 +303,6 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 					ret, err = apiv2.PostGroupMessage(context.TODO(), message.Params.GroupID.(string), groupMessage)
 					if err != nil {
 						mylog.Printf("发送图片失败: %v", err)
-					}
-					if ret != nil && ret.Message.Ret == 22009 {
-						mylog.Printf("信息发送失败,加入到队列中,下次被动信息进行发送")
-						var pair echo.MessageGroupPair
-						pair.Group = message.Params.GroupID.(string)
-						pair.GroupMessage = groupMessage
-						echo.PushGlobalStack(pair)
 					}
 				}
 				//发送成功回执
@@ -451,21 +361,6 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 		retmsg, _ = HandleSendPrivateMsg(client, api, apiv2, message)
 	default:
 		mylog.Printf("Unknown message type: %s", msgType)
-	}
-	//重置递归类型
-	if echo.GetMapping(idInt64) <= 0 {
-		echo.AddMsgType(config.GetAppIDStr(), idInt64, "")
-	}
-	echo.AddMapping(idInt64, echo.GetMapping(idInt64)-1)
-
-	//递归3次枚举类型
-	if echo.GetMapping(idInt64) > 0 {
-		tryMessageTypes := []string{"group", "guild", "guild_private"}
-		messageCopy := message // 创建message的副本
-		echo.AddMsgType(config.GetAppIDStr(), idInt64, tryMessageTypes[echo.GetMapping(idInt64)-1])
-		delay := config.GetSendDelay()
-		time.Sleep(time.Duration(delay) * time.Millisecond)
-		HandleSendGroupMsg(client, api, apiv2, messageCopy)
 	}
 	return retmsg, nil
 }
