@@ -49,11 +49,11 @@ func UploadBase64ImageHandler(rateLimiter *RateLimiter) gin.HandlerFunc {
 
 		base64Image := c.PostForm("base64Image")
 		// Print the length of the received base64 data
-		mylog.Println("Received base64 data length:", len(base64Image), "characters")
+		//mylog.Println("Received base64 data length:", len(base64Image), "characters")
 
 		imageBytes, err := base64.StdEncoding.DecodeString(base64Image)
 		if err != nil {
-			mylog.Println("Error while decoding base64:", err) // Print error while decoding
+			//mylog.Println("Error while decoding base64:", err) // Print error while decoding
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid base64 data"})
 			return
 		}
@@ -89,7 +89,7 @@ func UploadBase64ImageHandler(rateLimiter *RateLimiter) gin.HandlerFunc {
 				return
 			}
 		} else {
-			mylog.Println("File already exists, skipping save.")
+			//mylog.Println("File already exists, skipping save.")
 		}
 		
 		var serverPort string
@@ -133,7 +133,7 @@ func UploadBase64RecordHandler(rateLimiter *RateLimiter) gin.HandlerFunc {
 
 		base64REcord := c.PostForm("base64Record")
 		// Print the length of the received base64 data
-		mylog.Println("Received base64 data length:", len(base64REcord), "characters")
+		//mylog.Println("Received base64 data length:", len(base64REcord), "characters")
 
 		RecordBytes, err := base64.StdEncoding.DecodeString(base64REcord)
 		if err != nil {
@@ -161,7 +161,7 @@ func UploadBase64RecordHandler(rateLimiter *RateLimiter) gin.HandlerFunc {
 				return
 			}
 		} else {
-			mylog.Println("File already exists, skipping save.")
+			//mylog.Println("File already exists, skipping save.")
 		}
 
 		serverAddress := config.GetServer_dir()
@@ -203,7 +203,7 @@ func (rl *RateLimiter) CheckAndUpdateRateLimit(ipAddress string) bool {
 // 获取图片类型
 func getImageFormat(data []byte) (format string, err error) {
 	// Print the size of the data to check if it's being read correctly
-	mylog.Println("Received data size:", len(data), "bytes")
+	//mylog.Println("Received data size:", len(data), "bytes")
 
 	_, format, err = image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
@@ -213,7 +213,7 @@ func getImageFormat(data []byte) (format string, err error) {
 	}
 
 	// Print the detected format
-	mylog.Println("Detected image format:", format)
+	//mylog.Println("Detected image format:", format)
 
 	if format == "" {
 		return "", errors.New("undefined picture format")
