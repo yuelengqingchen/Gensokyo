@@ -74,8 +74,6 @@ func SendResponse(client callapi.Client, err error, message *callapi.ActionMessa
 		mylog.Printf("Error sending message via client: %v", sendErr)
 		return "", sendErr
 	}
-
-	mylog.Debugf("发送成功回执: %+v", string(jsonResponse))
 	return string(jsonResponse), nil
 }
 
