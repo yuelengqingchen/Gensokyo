@@ -131,7 +131,7 @@ func (c *Client) Listening() error {
 // Write 往 ws 写入数据
 func (c *Client) Write(message *dto.WSPayload) error {
 	m, _ := json.Marshal(message)
-	log.Infof("%s write %s message, %v", c.session, dto.OPMeans(message.OPCode), string(m))
+	log.Debugf("%s write %s message, %v", c.session, dto.OPMeans(message.OPCode), string(m))
 
 	if err := c.conn.WriteMessage(wss.TextMessage, m); err != nil {
 		log.Errorf("%s WriteMessage failed, %v", c.session, err)
@@ -205,7 +205,7 @@ func (c *Client) readMessageToQueue() {
 		atomic.StoreInt64(&global_s, payload.S)
 
 		payload.RawMessage = message
-		log.Infof("%s receive %s message, %s", c.session, dto.OPMeans(payload.OPCode), string(message))
+		log.Debugf("%s receive %s message, %s", c.session, dto.OPMeans(payload.OPCode), string(message))
 		// 处理内置的一些事件，如果处理成功，则这个事件不再投递给业务
 		if c.isHandleBuildIn(payload) {
 			continue
