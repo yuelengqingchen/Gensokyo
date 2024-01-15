@@ -33,7 +33,6 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 	// 使用 message.Echo 作为key来获取消息类型
 	var msgType string
 	var err error
-	var ret *dto.GroupMessageResponse
 	var retmsg string
 
 	msgType = "group"
