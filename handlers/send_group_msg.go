@@ -32,6 +32,7 @@ func init() {
 func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openapi.OpenAPI, message callapi.ActionMessage) (string, error) {
 	// 使用 message.Echo 作为key来获取消息类型
 	var msgType string
+	var ret *dto.GroupMessageResponse
 	var err error
 	var retmsg string
 
@@ -204,10 +205,13 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 
 			}
 			// 发送组合消息
-			err = apiv2.PostGroupMessage(context.TODO(), message.Params.GroupID.(string), groupMessage)
+			ret, err = apiv2.PostGroupMessage(context.TODO(), message.Params.GroupID.(string), groupMessage)
 			if err != nil {
 				mylog.Printf("发送组合消息失败: %v", err)
 				return "", nil // 或其他错误处理
+			}
+			if ret != nil && ret.Message.Ret == 22009 {
+				mylog.Errorf("主动消息达到上限")
 			}
 			// 发送成功回执
 			retmsg, _ = SendResponse(client, err, &message)
@@ -231,7 +235,7 @@ func HandleSendGroupMsg(client callapi.Client, api openapi.OpenAPI, apiv2 openap
 
 			groupMessage.Timestamp = time.Now().Unix() // 设置时间戳
 			//重新为err赋值
-			err = apiv2.PostGroupMessage(context.TODO(), message.Params.GroupID.(string), groupMessage)
+			ret, err = apiv2.PostGroupMessage(context.TODO(), message.Params.GroupID.(string), groupMessage)
 			if err != nil {
 				mylog.Printf("发送文本群组信息失败: %v", err)
 			}
