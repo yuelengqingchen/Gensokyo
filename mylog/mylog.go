@@ -258,6 +258,13 @@ func Fatalf(format string, v ...interface{}) {
 	LogToFile("Fatal", message)
 }
 
+func Debugf(format string, v ...interface{}) {
+	log.Printf(format, v...)
+	message := fmt.Sprintf(format, v...)
+	emitLog("Debug", message)
+	LogToFile("Debug", message)
+}
+
 func emitLog(level, message string) {
 	entry := EnhancedLogEntry{
 		Time:    time.Now().Format("2006-01-02T15:04:05"),
