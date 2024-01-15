@@ -75,7 +75,7 @@ func SendResponse(client callapi.Client, err error, message *callapi.ActionMessa
 		return "", sendErr
 	}
 
-	mylog.Printf("发送成功回执: %+v", string(jsonResponse))
+	mylog.Debug("发送成功回执: %+v", string(jsonResponse))
 	return string(jsonResponse), nil
 }
 
@@ -213,12 +213,6 @@ func parseMessageContent(paramsMessage callapi.ParamsContent, message callapi.Ac
 		// 移动替换操作到这里，确保所有匹配都被处理后再进行替换
 		messageText = pattern.pattern.ReplaceAllString(messageText, "")
 	}
-	//最后再处理Url
-	messageText = transformMessageTextUrl(messageText, message, client, api, apiv2)
-
-	// for key, items := range foundItems {
-	// 	fmt.Printf("Key: %s, Items: %v\n", key, items)
-	// }
 	return messageText, foundItems
 }
 
@@ -256,54 +250,6 @@ func transformMessageTextAt(messageText string) string {
 		}
 		return m
 	})
-	return messageText
-}
-
-// 链接处理
-func transformMessageTextUrl(messageText string, message callapi.ActionMessage, client callapi.Client, api openapi.OpenAPI, apiv2 openapi.OpenAPI) string {
-	// 是否处理url
-	if config.GetTransferUrl() {
-		// 判断服务器地址是否是IP地址
-		serverAddress := config.GetServer_dir()
-		isIP := isIPAddress(serverAddress)
-		VisualIP := config.GetVisibleIP()
-
-		// 使用xurls来查找和替换所有的URL
-		messageText = xurls.Relaxed.ReplaceAllStringFunc(messageText, func(originalURL string) string {
-			// 当服务器地址是IP地址且GetVisibleIP为false时，替换URL为空
-			if isIP && !VisualIP {
-				return ""
-			}
-
-			// 如果启用了URL到QR码的转换
-			if config.GetUrlToQrimage() {
-				// 将URL转换为QR码的字节形式
-				qrCodeGenerator, _ := qrcode.New(originalURL, qrcode.High)
-				qrCodeGenerator.DisableBorder = true
-				qrSize := config.GetQrSize()
-				pngBytes, _ := qrCodeGenerator.PNG(qrSize)
-				//pngBytes 二维码图片的字节数据
-				base64Image := base64.StdEncoding.EncodeToString(pngBytes)
-				picmsg := processActionMessageWithBase64PicReplace(base64Image, message)
-				ret := callapi.CallAPIFromDict(client, api, apiv2, picmsg)
-				mylog.Printf("发送url转图片结果:%v", ret)
-				// 从文本中去除原始URL
-				return "" // 返回空字符串以去除URL
-			}
-
-			// 根据配置处理URL
-			if config.GetLotusValue() {
-				// 连接到另一个gensokyo
-				shortURL := url.GenerateShortURL(originalURL)
-				return shortURL
-			} else {
-				// 自己是主节点
-				shortURL := url.GenerateShortURL(originalURL)
-				// 使用getBaseURL函数来获取baseUrl并与shortURL组合
-				return url.GetBaseURL() + "/url/" + shortURL
-			}
-		})
-	}
 	return messageText
 }
 
@@ -392,193 +338,6 @@ func RevertTransformedText(data interface{}, msgtype string, api openapi.OpenAPI
 			messageText = strings.TrimSpace(messageText)
 		}
 	}
-	//mylog.Printf("2[%v]", messageText)
-
-	// 检查是否需要移除前缀
-	if config.GetRemovePrefixValue() {
-		// 移除消息内容中第一次出现的 "/"
-		if idx := strings.Index(messageText, "/"); idx != -1 {
-			messageText = messageText[:idx] + messageText[idx+1:]
-		}
-	}
-
-	// 检查是否启用白名单模式
-	if config.GetWhitePrefixMode() && whitenable {
-		// 获取白名单反转标志
-		whiteBypassRevers := config.GetWhiteBypassRevers()
-
-		// 获取白名单例外群数组（现在返回 int64 数组）
-		whiteBypass := config.GetWhiteBypass()
-		bypass := false
-
-		// 根据 whiteBypassRevers 的值来改变逻辑
-		if whiteBypassRevers {
-			// 如果反转白名单效果，只有在白名单数组中的 vgid 或 vuid 才生效
-			bypass = true // 默认设置为 true，意味着需要白名单检查
-			for _, id := range whiteBypass {
-				if id == vgid || id == vuid {
-					bypass = false // 如果在白名单数组中找到了 vgid 或 vuid，设置为 false
-					break
-				}
-			}
-		} else {
-			// 常规逻辑：检查 vgid 是否在白名单例外数组中
-			for _, id := range whiteBypass {
-				if id == vgid || id == vuid {
-					bypass = true
-					break
-				}
-			}
-		}
-
-		// 如果vgid不在白名单例外数组中，则应用白名单过滤
-		if !bypass {
-			// 获取白名单数组
-			whitePrefixes := config.GetWhitePrefixs()
-			// 加锁以安全地读取 TemporaryCommands
-			idmap.MutexT.Lock()
-			temporaryCommands := make([]string, len(idmap.TemporaryCommands))
-			copy(temporaryCommands, idmap.TemporaryCommands)
-			idmap.MutexT.Unlock()
-
-			// 合并白名单和临时指令
-			allPrefixes := append(whitePrefixes, temporaryCommands...)
-			// 默认设置为不匹配
-			matched := false
-
-			// 遍历白名单数组，检查是否有匹配项
-			for _, prefix := range allPrefixes {
-				if strings.HasPrefix(messageText, prefix) {
-					// 找到匹配项，保留 messageText 并跳出循环
-					matched = true
-					break
-				}
-			}
-
-			// 如果没有匹配项，则将 messageText 置为兜底回复 兜底回复可空
-			if !matched {
-				messageText = ""
-				SendMessage(config.GetNoWhiteResponse(), data, msgtype, api, apiv2)
-			}
-		}
-	}
-	//mylog.Printf("3[%v]", messageText)
-	//检查是否启用黑名单模式
-	if config.GetBlackPrefixMode() {
-		// 获取黑名单数组
-		blackPrefixes := config.GetBlackPrefixs()
-		// 遍历黑名单数组，检查是否有匹配项
-		for _, prefix := range blackPrefixes {
-			if strings.HasPrefix(messageText, prefix) {
-				// 找到匹配项，将 messageText 置为空并停止处理
-				messageText = ""
-				break
-			}
-		}
-	}
-	// 移除以 GetVisualkPrefixs 数组开头的文本
-	visualkPrefixs := config.GetVisualkPrefixs()
-	var matchedPrefix *config.VisualPrefixConfig
-	var isSpecialType bool    // 用于标记是否为特殊类型
-	var originalPrefix string // 存储原始前缀
-
-	// 处理特殊类型前缀
-	specialPrefixes := make(map[int]string)
-	for i, vp := range visualkPrefixs {
-		if strings.HasPrefix(vp.Prefix, "*") {
-			specialPrefixes[i] = vp.Prefix                                // 保存原始前缀
-			visualkPrefixs[i].Prefix = strings.TrimPrefix(vp.Prefix, "*") // 移除 '*'
-		}
-	}
-
-	for i, vp := range visualkPrefixs {
-		if strings.HasPrefix(messageText, vp.Prefix) {
-			if _, ok := specialPrefixes[i]; ok {
-				isSpecialType = true
-				originalPrefix = specialPrefixes[i] // 恢复原始前缀
-			}
-			// 检查 messageText 的长度是否大于 prefix 的长度
-			if len(messageText) > len(vp.Prefix) {
-				// 移除找到的前缀 且messageText不为空格
-				if messageText != " " {
-					messageText = strings.TrimPrefix(messageText, vp.Prefix)
-					messageText = strings.TrimSpace(messageText)
-					matchedPrefix = &vp
-				}
-				break // 只移除第一个匹配的前缀
-			}
-		}
-	}
-
-	// 已经完成了移除前缀等操作,进行aliases替换
-	aliases := config.GetAlias()
-	messageText = processMessageText(messageText, aliases)
-	//mylog.Printf("4[%v]", messageText)
-	// 检查是否启用二级白名单模式
-	if config.GetVwhitePrefixMode() && matchedPrefix != nil {
-		// 获取白名单反转标志
-		whiteBypassRevers := config.GetWhiteBypassRevers()
-
-		// 获取白名单例外群数组（现在返回 int64 数组）
-		whiteBypass := config.GetWhiteBypass()
-		bypass := false
-
-		// 根据 whiteBypassRevers 的值来改变逻辑
-		if whiteBypassRevers {
-			// 如果反转白名单效果，只有在白名单数组中的 vgid 或 vuid 才生效
-			bypass = true // 默认设置为 true，意味着需要白名单检查
-			for _, id := range whiteBypass {
-				if id == vgid || id == vuid {
-					bypass = false // 如果在白名单数组中找到了 vgid 或 vuid，设置为 false
-					break
-				}
-			}
-		} else {
-			// 常规逻辑：检查 vgid 是否在白名单例外数组中
-			for _, id := range whiteBypass {
-				if id == vgid || id == vuid {
-					bypass = true
-					break
-				}
-			}
-		}
-
-		// 如果vgid不在白名单例外数组中，则应用白名单过滤
-		if !bypass {
-			allPrefixes := matchedPrefix.WhiteList
-			idmap.MutexT.Lock()
-			temporaryCommands := make([]string, len(idmap.TemporaryCommands))
-			copy(temporaryCommands, idmap.TemporaryCommands)
-			idmap.MutexT.Unlock()
-
-			// 合并虚拟前缀的白名单和临时指令
-			allPrefixes = append(allPrefixes, temporaryCommands...)
-			matched := false
-
-			// 遍历白名单数组，检查是否有匹配项
-			for _, prefix := range allPrefixes {
-				if strings.HasPrefix(messageText, prefix) {
-					matched = true
-					break
-				}
-			}
-
-			// 如果没有匹配项，则将 messageText 置为对应的兜底回复
-			if !matched {
-				messageText = ""
-				SendMessage(matchedPrefix.NoWhiteResponse, data, msgtype, api, apiv2)
-			}
-		}
-	}
-
-	// 在返回 messageText 时，根据 isSpecialType 判断是否需要添加原始前缀
-	if isSpecialType && matchedPrefix != nil {
-		//移除开头的*
-		originalPrefix = strings.TrimPrefix(originalPrefix, "*")
-		messageText = originalPrefix + messageText
-	}
-	//mylog.Printf("5[%v]", messageText)
-	// 如果未启用白名单模式或没有匹配的虚拟前缀，执行默认逻辑
 
 	// 处理图片附件
 	for _, attachment := range msg.Attachments {
