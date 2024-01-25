@@ -65,10 +65,10 @@ func wsHandler(api openapi.OpenAPI, apiV2 openapi.OpenAPI, p *Processor.Processo
 	// 如果配置的 token 不为空，但提供的 token 为空或不匹配
 	if validToken != "" && (token == "" || token != validToken) {
 		if token == "" {
-			mylog.Debugf("Connection failed due to missing token. Headers: %v", c.Request.Header)
+			mylog.Errorf("Connection failed due to missing token. Headers: %v", c.Request.Header)
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing token"})
 		} else {
-			mylog.Debugf("Connection failed due to incorrect token. Headers: %v, Provided token: %s", c.Request.Header, token)
+			mylog.Errorf("Connection failed due to incorrect token. Headers: %v, Provided token: %s", c.Request.Header, token)
 			c.JSON(http.StatusForbidden, gin.H{"error": "Incorrect token"})
 		}
 		return
@@ -76,12 +76,12 @@ func wsHandler(api openapi.OpenAPI, apiV2 openapi.OpenAPI, p *Processor.Processo
 
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
-		mylog.Debugf("Failed to set websocket upgrade: %+v", err)
+		mylog.Errorf("Failed to set websocket upgrade: %+v", err)
 		return
 	}
 
 	clientIP := c.ClientIP()
-	mylog.Debugf("WebSocket client connected. IP: %s", clientIP)
+	mylog.Errorf("WebSocket client connected. IP: %s", clientIP)
 
 	// 创建WebSocketServerClient实例
 	client := &WebSocketServerClient{
@@ -105,7 +105,7 @@ func wsHandler(api openapi.OpenAPI, apiV2 openapi.OpenAPI, p *Processor.Processo
 	}
 	err = client.SendMessage(message)
 	if err != nil {
-		mylog.Debugf("Error sending connection success message: %v\n", err)
+		mylog.Errorf("Error sending connection success message: %v\n", err)
 	}
 
 	// 在defer语句之前运行
@@ -124,7 +124,7 @@ func wsHandler(api openapi.OpenAPI, apiV2 openapi.OpenAPI, p *Processor.Processo
 	for {
 		messageType, p, err := conn.ReadMessage()
 		if err != nil {
-			mylog.Debugf("Error reading message: %v", err)
+			mylog.Errorf("Error reading message: %v", err)
 			return
 		}
 
@@ -138,11 +138,11 @@ func processWSMessage(client *WebSocketServerClient, msg []byte) {
 	var message callapi.ActionMessage
 	err := json.Unmarshal(msg, &message)
 	if err != nil {
-		mylog.Debugf("Error unmarshalling message: %v, Original message: %s", err, string(msg))
+		mylog.Errorf("Error unmarshalling message: %v, Original message: %s", err, string(msg))
 		return
 	}
 
-	mylog.Debugf("Received from WebSocket onebotv11 client:", wsclient.TruncateMessage(message, 500))
+	mylog.Errorf("Received from WebSocket onebotv11 client:", wsclient.TruncateMessage(message, 500))
 	// 调用callapi
 	callapi.CallAPIFromDict(client, client.API, client.APIv2, message)
 }
